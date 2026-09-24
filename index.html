@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ผจญภัยนักสะกดคำ(ครูภูทัด)(Thai Word Adventure)</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Kanit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Kanit', 'sans-serif'],
+                        display: ['Fredoka One', 'cursive'],
+                    },
+                    colors: {
+                        primary: '#f97316', // Orange 500
+                        secondary: '#38bdf8', // Sky 400
+                        success: '#22c55e', // Green 500
+                        gold: '#fbbf24', // Yellow 400
+                        danger: '#ef4444', // Red 500
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #e0f2fe; /* light sky background */
+            touch-action: manipulation; /* Disable double-tap to zoom */
+        }
+
+        /* 3D Button Style */
+        .btn-3d {
+            transition: all 0.1s ease-in-out;
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+        }
+        .btn-3d:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 rgba(0, 0, 0, 0.2);
+        }
+        .btn-3d.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
+            transform: translateY(4px);
+        }
+
+        /* Animations */
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+        .animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+
+        /* Vowel/Tone marks alignment fix for blocks */
+        .thai-char {
+            display: inline-block;
+            line-height: 1;
+            /* Give some space so tone marks aren't clipped */
+            padding-top: 5px; 
+        }
+
+        /* Particle styles */
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            border-radius: 50%;
+            z-index: 50;
+            animation: pop 1s ease-out forwards;
+        }
+
+        @keyframes pop {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+        }
+
+        /* Hide scrollbar */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+    </style>
+</head>
+<body class="text-gray-800 flex justify-center h-[100dvh] overflow-hidden">
+
+    <main class="w-full max-w-[420px] h-full bg-white relative flex flex-col shadow-2xl overflow-hidden">
+        
+        <!-- Start Screen Overlay -->
+        <div id="start-screen" class="absolute inset-0 z-50 bg-secondary flex flex-col items-center justify-center p-6 text-white text-center">
+            <h1 class="text-4xl font-display mb-6 drop-shadow-md text-gold">ผจญภัย<br>นักสะกดคำ</h1>
+            <div class="w-32 h-32 rounded-full border-4 border-white mb-6 bg-gold shadow-lg flex items-center justify-center text-7xl pb-2">🦁</div>
+            <p class="text-lg font-medium mb-8 bg-black/20 p-4 rounded-xl">เรียนรู้คำศัพท์ภาษาไทย<br>ผ่านการเล่นเกมที่สนุกสนาน!</p>
+            <button id="start-btn" onclick="startGame()" class="btn-3d bg-success text-white font-bold text-2xl py-4 px-10 rounded-2xl border-b-4 border-green-700 w-full max-w-[300px]">
+                เริ่มเกม <i class="fa-solid fa-play ml-2"></i>
+            </button>
+        </div>
+
+        <header class="bg-primary text-white p-4 pt-6 rounded-b-3xl shadow-md z-10 shrink-0">
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-2">
+                    <button onclick="goHome()" class="btn-3d w-8 h-8 bg-orange-600 rounded-full flex items-center justify-center shrink-0 border-b-2 border-orange-800 shadow-sm" title="กลับหน้าแรก">
+                        <i class="fa-solid fa-house text-sm"></i>
+                    </button>
+                    <div class="bg-black/20 px-3 py-1 rounded-full flex items-center font-bold">
+                        <i class="fa-solid fa-star text-gold mr-2"></i> เลเวล <span id="ui-level" class="ml-1 text-xl">1</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <div class="bg-black/20 px-3 py-1 rounded-full flex items-center font-bold text-gold">
+                        <i class="fa-solid fa-coins mr-2"></i> <span id="ui-coins">0</span>
+                    </div>
+                    <div class="bg-black/20 px-3 py-1 rounded-full flex items-center font-bold text-secondary">
+                        <i class="fa-solid fa-bolt mr-2"></i> x<span id="ui-combo">0</span>
+                    </div>
+                </div>
+            </div>
+            <!-- XP Bar -->
+            <div class="w-full bg-black/30 h-4 rounded-full overflow-hidden relative">
+                <div id="xp-bar" class="bg-success h-full transition-all duration-500 ease-out w-0 rounded-full"></div>
+                <div class="absolute inset-0 flex items-center justify-center text-[10px] font-bold opacity-80" id="xp-text">0 / 100 XP</div>
+            </div>
+        </header>
+
+        <div class="flex-1 flex flex-col p-4 overflow-y-auto relative z-0">
+            
+            <!-- NPC Card -->
+            <div class="bg-blue-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm border-2 border-blue-200 mb-4 animate-bounce-in" id="npc-card">
+                <div class="w-16 h-16 rounded-full bg-gold shrink-0 border-2 border-white shadow-inner flex items-center justify-center text-4xl pb-1">
+                    🦁
+                </div>
+                <div class="flex-1">
+                    <div class="text-sm font-bold text-blue-800 mb-1">ครูสิงโต "ใจดี"</div>
+                    <div class="text-xs text-gray-600 bg-white p-2 rounded-lg relative bubble shadow-sm">
+                        ฟังเสียงแล้วสะกดคำให้ถูกต้องนะ!
+                        <div class="absolute w-3 h-3 bg-white transform rotate-45 -left-1 top-2"></div>
+                    </div>
+                </div>
+                <button onclick="playWordAudio()" class="btn-3d w-12 h-12 bg-secondary text-white rounded-xl flex items-center justify-center shrink-0 border-b-4 border-blue-600">
+                    <i class="fa-solid fa-volume-high text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Hint Button Container -->
+            <div class="flex justify-end mb-4">
+                <button onclick="showHint()" class="btn-3d bg-gold text-white font-bold py-2 px-4 rounded-xl text-sm border-b-4 border-yellow-600 flex items-center gap-2">
+                    <i class="fa-regular fa-lightbulb"></i> ขอคำใบ้
+                </button>
+            </div>
+
+            <div class="bg-white rounded-2xl p-4 shadow-sm border-2 border-gray-100 mb-auto min-h-[120px] flex flex-col justify-center">
+                <div class="text-center text-sm text-gray-500 mb-3 font-medium">คำตอบของคุณ:</div>
+                <div id="answer-slots" class="flex flex-wrap justify-center gap-2">
+                    <!-- Slots will be generated here by JS -->
+                </div>
+            </div>
+
+            <div class="mt-4 pb-6">
+                <div class="text-center text-sm text-gray-500 mb-3 font-medium">เลือกตัวอักษรเพื่อเติมคำ:</div>
+                <div id="choice-container" class="flex flex-wrap justify-center gap-2">
+                    <!-- Choice buttons will be generated here by JS -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Custom Modal Overlay -->
+    <div id="modal-overlay" class="absolute inset-0 z-50 bg-black/60 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        
+        <!-- Generic Popup -->
+        <div id="modal-content" class="bg-white rounded-3xl p-6 w-full max-w-[320px] text-center transform scale-90 transition-transform duration-300 shadow-2xl">
+            <div id="modal-icon" class="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl mb-4 -mt-12 shadow-lg border-4 border-white">
+                <!-- Icon injected by JS -->
+            </div>
+            <h2 id="modal-title" class="text-2xl font-bold mb-2">Title</h2>
+            <p id="modal-text" class="text-gray-600 mb-6 font-medium">Message</p>
+            <div id="modal-rewards" class="hidden flex justify-center gap-4 mb-6">
+                <div class="bg-green-100 text-green-700 px-3 py-1 rounded-full font-bold text-sm"><i class="fa-solid fa-star"></i> +<span id="reward-xp">10</span> XP</div>
+                <div class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full font-bold text-sm"><i class="fa-solid fa-coins"></i> +<span id="reward-coin">5</span></div>
+            </div>
+            <button id="modal-btn" class="btn-3d w-full font-bold text-lg py-3 rounded-xl text-white">
+                ตกลง
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Game Data & Word Bank ---
+        const wordBank = [
+            // Level 1: Basic words
+            { word: "นา", hint: "พื้นที่สำหรับปลูกข้าว", level: 1 },
+            { word: "บก", hint: "พื้นดินที่ไม่ใช่น้ำ", level: 1 },
+            { word: "นก", hint: "สัตว์มีปีก บินได้บนท้องฟ้า", level: 1 },
+            { word: "ดาว", hint: "สิ่งสว่างบนท้องฟ้าตอนกลางคืน", level: 1 },
+            { word: "บ้าน", hint: "สถานที่ที่เราอยู่อาศัย", level: 1 },
+            { word: "ขนม", hint: "ของกินเล่น รสชาติหวานหรือเค็ม", level: 1 },
+            { word: "ทะเล", hint: "แหล่งน้ำเค็มขนาดใหญ่", level: 1 },
+            { word: "ดิน", hint: "สิ่งที่เราใช้ปลูกต้นไม้", level: 1 },
+            { word: "สี", hint: "แดง เหลือง น้ำเงิน", level: 1 },
+            { word: "แมว", hint: "สัตว์เลี้ยง ร้องเหมียวๆ", level: 1 },
+            
+            // Level 2: Multi-syllable & Vowel complexities
+            { word: "โรงเรียน", hint: "สถานที่สำหรับนักเรียนไปเรียนหนังสือ", level: 2 },
+            { word: "ต้นไม้", hint: "พืชที่มีลำต้นใหญ่ มีใบสีเขียว", level: 2 },
+            { word: "ดอกไม้", hint: "ส่วนของพืชที่มีสีสันสวยงามและมีกลิ่นหอม", level: 2 },
+            { word: "หนังสือ", hint: "สิ่งที่เราใช้อ่านเพื่อหาความรู้", level: 2 },
+            { word: "จักรยาน", hint: "ยานพาหนะที่มี 2 ล้อ ต้องปั่น", level: 2 },
+            { word: "ดนตรี", hint: "เสียงที่จัดเรียงให้เกิดความไพเราะ", level: 2 },
+            { word: "สวนสัตว์", hint: "สถานที่ที่มีสัตว์หลากหลายชนิดให้ชม", level: 2 },
+            
+            // Level 3: Academic / Harder spelling
+            { word: "ธรรมชาติ", hint: "สิ่งที่เกิดขึ้นเอง เช่น ป่าเขา แม่น้ำ", level: 3 },
+            { word: "ประโยชน์", hint: "ผลดีที่ได้รับ", level: 3 },
+            { word: "ประชาชน", hint: "พลเมืองของประเทศ", level: 3 },
+            { word: "ปฏิบัติ", hint: "การลงมือทำ", level: 3 },
+            { word: "วัฒนธรรม", hint: "สิ่งที่แสดงถึงความเจริญงอกงามของหมู่คณะ", level: 3 },
+            { word: "ความสุข", hint: "ความรู้สึกดีใจ สบายใจ", level: 3 },
+            { word: "ท้องถิ่น", hint: "พื้นที่แต่ละบริเวณที่มีคนอาศัยอยู่", level: 3 }
+        ];
+
+        // Thai characters for decoys
+        const thaiConsonants = "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ".split('');
+        const thaiVowels = "ะาิีึืุูเแโใไ".split('');
+
+        // --- 2. Game State ---
+        let gameState = {
+            playerLevel: 1,
+            xp: 0,
+            maxXp: 100,
+            coins: 0,
+            combo: 0,
+            consecutiveCorrect: 0,
+            wordLevel: 1, 
+            currentWordData: null,
+            answerState: [], // Array representing slots, null if empty
+            choicesState: [], // Available letters to pick
+            audioCtx: null,
+            gameStarted: false
+        };
+
+        // DOM Elements
+        const uiLevel = document.getElementById('ui-level');
+        const uiCoins = document.getElementById('ui-coins');
+        const uiCombo = document.getElementById('ui-combo');
+        const xpBar = document.getElementById('xp-bar');
+        const xpText = document.getElementById('xp-text');
+        const answerSlotsContainer = document.getElementById('answer-slots');
+        const choiceContainer = document.getElementById('choice-container');
+        
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalContent = document.getElementById('modal-content');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalText = document.getElementById('modal-text');
+        const modalRewards = document.getElementById('modal-rewards');
+        const modalBtn = document.getElementById('modal-btn');
+
+        // --- 3. Audio System ---
+        function initAudio() {
+            if (!gameState.audioCtx) {
+                gameState.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (gameState.audioCtx.state === 'suspended') {
+                gameState.audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!gameState.audioCtx) return;
+            const ctx = gameState.audioCtx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            const now = ctx.currentTime;
+            
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'levelup') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.setValueAtTime(450, now + 0.15);
+                osc.frequency.setValueAtTime(600, now + 0.3);
+                osc.frequency.setValueAtTime(900, now + 0.45);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.6);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            }
+        }
+
+        function playWordAudio() {
+            if (!gameState.currentWordData) return;
+            playSound('click');
+            
+            // Cancel any ongoing speech
+            window.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(gameState.currentWordData.word);
+            utterance.lang = 'th-TH';
+            utterance.rate = 0.85; // Slightly slower for clarity
+            utterance.pitch = 1.1; // Cute pitch
+            
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- 4. Game Logic ---
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            
+            // โหลดคำใหม่เฉพาะตอนเริ่มเกมครั้งแรก
+            if (!gameState.gameStarted) {
+                gameState.gameStarted = true;
+                loadNewWord();
+            }
+        }
+
+        function goHome() {
+            playSound('click');
+            document.getElementById('start-screen').classList.remove('hidden');
+            
+            // เปลี่ยนข้อความปุ่มเมื่อเกมเริ่มไปแล้ว
+            const startBtn = document.getElementById('start-btn');
+            if (startBtn && gameState.gameStarted) {
+                startBtn.innerHTML = 'เล่นต่อ <i class="fa-solid fa-play ml-2"></i>';
+            }
+        }
+
+        function loadNewWord() {
+            // Filter words by level
+            let availableWords = wordBank.filter(w => w.level === gameState.wordLevel);
+            if (availableWords.length === 0) {
+                availableWords = wordBank; // Fallback
+            }
+            
+            // Pick random word
+            const randomIndex = Math.floor(Math.random() * availableWords.length);
+            const selected = availableWords[randomIndex];
+            gameState.currentWordData = selected;
+            
+            // Setup slots and choices
+            const wordChars = Array.from(selected.word); // Splits Thai characters safely
+            gameState.answerState = new Array(wordChars.length).fill(null);
+            
+            gameState.choicesState = wordChars.map((char, index) => ({
+                id: `char-${index}`,
+                char: char,
+                isDecoy: false,
+                used: false
+            }));
+
+            // Add Decoys based on level
+            let decoyCount = 0;
+            if (gameState.wordLevel === 2) decoyCount = 2;
+            if (gameState.wordLevel === 3) decoyCount = 4;
+            
+            for(let i = 0; i < decoyCount; i++) {
+                // Mix consonants and vowels for decoys
+                const isVowel = Math.random() > 0.5;
+                const sourceArray = isVowel ? thaiVowels : thaiConsonants;
+                const char = sourceArray[Math.floor(Math.random() * sourceArray.length)];
+                
+                gameState.choicesState.push({
+                    id: `decoy-${i}`,
+                    char: char,
+                    isDecoy: true,
+                    used: false
+                });
+            }
+
+            // Shuffle choices
+            gameState.choicesState.sort(() => Math.random() - 0.5);
+
+            renderGame();
+            
+            // Auto play word sound slightly after render
+            setTimeout(() => {
+                if(gameState.gameStarted) playWordAudio();
+            }, 500);
+        }
+
+        // --- 5. Rendering UI ---
+        function renderGame() {
+            updateHUD();
+            
+            // Render Answer Slots
+            answerSlotsContainer.innerHTML = '';
+            gameState.answerState.forEach((choiceItem, index) => {
+                const slot = document.createElement('div');
+                slot.className = `w-12 h-14 sm:w-14 sm:h-16 rounded-xl border-4 flex items-center justify-center text-2xl font-bold font-kanit transition-all
+                                ${choiceItem 
+                                    ? 'bg-secondary border-blue-500 text-white shadow-md cursor-pointer btn-3d' 
+                                    : 'bg-gray-100 border-dashed border-gray-300'}`;
+                
+                if (choiceItem) {
+                    slot.innerHTML = `<span class="thai-char">${choiceItem.char}</span>`;
+                    slot.onclick = () => returnLetter(index);
+                }
+                
+                answerSlotsContainer.appendChild(slot);
+            });
+
+            // Render Choices
+            choiceContainer.innerHTML = '';
+            gameState.choicesState.forEach((choice, index) => {
+                const btn = document.createElement('button');
+                btn.className = `w-12 h-14 sm:w-14 sm:h-16 rounded-xl flex items-center justify-center text-2xl font-bold font-kanit btn-3d
+                                ${choice.used 
+                                    ? 'bg-gray-200 text-gray-400 border-b-4 border-gray-300 disabled' 
+                                    : 'bg-white text-blue-900 border-2 border-gray-200 border-b-4 border-gray-300'}`;
+                
+                btn.innerHTML = `<span class="thai-char">${choice.char}</span>`;
+                
+                if (!choice.used) {
+                    btn.onclick = () => selectLetter(index);
+                }
+                
+                choiceContainer.appendChild(btn);
+            });
+        }
+
+        function updateHUD() {
+            uiLevel.textContent = gameState.playerLevel;
+            uiCoins.textContent = gameState.coins;
+            uiCombo.textContent = gameState.combo;
+            
+            const xpPercent = Math.min((gameState.xp / gameState.maxXp) * 100, 100);
+            xpBar.style.width = `${xpPercent}%`;
+            xpText.textContent = `${gameState.xp} / ${gameState.maxXp} XP`;
+        }
+
+        // --- 6. Interactions ---
+        function selectLetter(choiceIndex) {
+            playSound('click');
+            const choice = gameState.choicesState[choiceIndex];
+            
+            // Find first empty slot
+            const emptySlotIndex = gameState.answerState.findIndex(slot => slot === null);
+            
+            if (emptySlotIndex !== -1) {
+                // Move letter to slot
+                gameState.answerState[emptySlotIndex] = choice;
+                choice.used = true;
+                
+                renderGame();
+                checkWinCondition();
+            }
+        }
+
+        function returnLetter(slotIndex) {
+            playSound('click');
+            const choiceItem = gameState.answerState[slotIndex];
+            if (choiceItem) {
+                // Mark as unused in choices
+                const choiceRef = gameState.choicesState.find(c => c.id === choiceItem.id);
+                if (choiceRef) choiceRef.used = false;
+                
+                // Clear slot
+                gameState.answerState[slotIndex] = null;
+                renderGame();
+            }
+        }
+
+        function checkWinCondition() {
+            // Check if all slots are filled
+            if (gameState.answerState.includes(null)) return;
+
+            const currentAnswer = gameState.answerState.map(c => c.char).join('');
+            
+            if (currentAnswer === gameState.currentWordData.word) {
+                // Correct!
+                handleCorrectAnswer();
+            } else {
+                // Wrong!
+                handleWrongAnswer();
+            }
+        }
+
+        function handleCorrectAnswer() {
+            playSound('correct');
+            createParticles();
+            
+            // Calculate Rewards
+            gameState.combo++;
+            gameState.consecutiveCorrect++;
+            
+            const xpGain = 10 + (gameState.combo * 2);
+            const coinGain = 5 + gameState.combo;
+            
+            gameState.xp += xpGain;
+            gameState.coins += coinGain;
+            
+            let isLevelUp = false;
+            if (gameState.xp >= gameState.maxXp) {
+                gameState.playerLevel++;
+                gameState.xp = gameState.xp - gameState.maxXp;
+                gameState.maxXp = Math.floor(gameState.maxXp * 1.5);
+                isLevelUp = true;
+            }
+
+            // Adaptive difficulty
+            if (gameState.consecutiveCorrect >= 4 && gameState.wordLevel < 3) {
+                gameState.wordLevel++;
+                gameState.consecutiveCorrect = 0;
+            }
+
+            updateHUD();
+
+            // Show Success Modal
+            setTimeout(() => {
+                if (isLevelUp) {
+                    playSound('levelup');
+                    showModal(
+                        'เลเวลอัพ! 🎉',
+                        `ยินดีด้วย! คุณเก่งขึ้นแล้ว ตอนนี้อยู่เลเวล ${gameState.playerLevel}`,
+                        'success',
+                        () => loadNewWord(),
+                        { xp: xpGain, coin: coinGain },
+                        'fa-arrow-up-right-dots bg-gold text-white'
+                    );
+                } else {
+                    showModal(
+                        'ถูกต้อง! 🌟',
+                        `เก่งมาก! คำนี้คือ "${gameState.currentWordData.word}"`,
+                        'success',
+                        () => loadNewWord(),
+                        { xp: xpGain, coin: coinGain },
+                        'fa-check bg-success text-white'
+                    );
+                }
+            }, 500);
+        }
+
+        function handleWrongAnswer() {
+            playSound('wrong');
+            gameState.combo = 0;
+            gameState.consecutiveCorrect = 0;
+            updateHUD();
+            
+            // Shake animation on slots
+            const slotsContainer = document.getElementById('answer-slots');
+            slotsContainer.classList.add('animate-shake');
+            
+            // Auto return all letters after short delay
+            setTimeout(() => {
+                slotsContainer.classList.remove('animate-shake');
+                gameState.answerState.forEach((item, index) => {
+                    if (item) returnLetter(index);
+                });
+            }, 600);
+        }
+
+        // --- 7. Modals & Utilities ---
+        function showHint() {
+            playSound('click');
+            showModal(
+                'คำใบ้ 💡',
+                gameState.currentWordData.hint,
+                'info',
+                null,
+                null,
+                'fa-lightbulb bg-secondary text-white'
+            );
+        }
+
+        let modalCallback = null;
+        function showModal(title, text, type, callback, rewards, iconClass) {
+            modalTitle.textContent = title;
+            modalText.textContent = text;
+            
+            modalIcon.className = `w-20 h-20 mx-auto rounded-full flex items-center justify-center text-4xl mb-4 -mt-12 shadow-lg border-4 border-white ${iconClass}`;
+            modalIcon.innerHTML = `<i class="fa-solid ${iconClass.split(' ')[0]}"></i>`;
+
+            if (rewards) {
+                modalRewards.classList.remove('hidden');
+                modalRewards.classList.add('flex');
+                document.getElementById('reward-xp').textContent = rewards.xp;
+                document.getElementById('reward-coin').textContent = rewards.coin;
+            } else {
+                modalRewards.classList.add('hidden');
+                modalRewards.classList.remove('flex');
+            }
+
+            // Style button based on type
+            modalBtn.className = 'btn-3d w-full font-bold text-lg py-3 rounded-xl text-white ' + 
+                (type === 'success' ? 'bg-success border-b-4 border-green-700' : 'bg-primary border-b-4 border-orange-700');
+
+            modalCallback = callback;
+            
+            modalOverlay.classList.remove('hidden');
+            // Trigger reflow for animation
+            void modalOverlay.offsetWidth;
+            modalOverlay.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-90');
+        }
+
+        modalBtn.addEventListener('click', () => {
+            playSound('click');
+            modalOverlay.classList.add('opacity-0');
+            modalContent.classList.add('scale-90');
+            
+            setTimeout(() => {
+                modalOverlay.classList.add('hidden');
+                if (modalCallback) modalCallback();
+            }, 300);
+        });
+
+        function createParticles() {
+            const colors = ['#f97316', '#38bdf8', '#22c55e', '#fbbf24'];
+            const container = document.body;
+            
+            for (let i = 0; i < 20; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // Randomize appearance
+                const size = Math.random() * 10 + 5;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Start from center
+                particle.style.width = `${size}px`;
+                particle.style.height = `${size}px`;
+                particle.style.backgroundColor = color;
+                particle.style.left = `50%`;
+                particle.style.top = `50%`;
+                
+                // Random trajectory for animation
+                const angle = Math.random() * Math.PI * 2;
+                const velocity = 50 + Math.random() * 100;
+                const tx = Math.cos(angle) * velocity;
+                const ty = Math.sin(angle) * velocity;
+                
+                particle.style.setProperty('--tx', `${tx}px`);
+                particle.style.setProperty('--ty', `${ty}px`);
+                
+                container.appendChild(particle);
+                
+                // Cleanup
+                setTimeout(() => {
+                    particle.remove();
+                }, 1000);
+            }
+        }
+
+    </script>
+</body>
+</html>
